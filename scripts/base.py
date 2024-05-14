@@ -250,9 +250,6 @@ def copy_lib(src, dst, name):
         create_dir(dst + "/simulator")
         copy_dir(src + "/simulator/" + name + ".framework", dst + "/simulator/" + name + ".framework")
 
-        if is_dir(dst + "/" + name + ".xcframework"):
-          delete_dir(dst + "/" + name + ".xcframework")
-
         cmd("xcodebuild", ["-create-xcframework", 
             "-framework", dst + "/" + name + ".framework", 
             "-framework", dst + "/simulator/" + name + ".framework", 
@@ -499,13 +496,19 @@ def set_cwd(dir):
 def git_update(repo, is_no_errors=False, is_current_dir=False, git_owner=""):
   print("[git] update: " + repo)
   owner = git_owner if git_owner else "ONLYOFFICE"
+
+  unlimited_organization = "rogermelich"
+  unlimited_tag_suffix = "-roger"
+  unlimited_modified_repos = ["server", "web-apps"]
+  if (repo in unlimited_modified_repos):
+    owner = unlimited_organization
+    branch_to_checkout = config.option("branch")
+  else:
+    branch_to_checkout = re.sub(unlimited_tag_suffix, '', config.option("branch"))
+
   url = "https://github.com/" + owner + "/" + repo + ".git"
-  if (repo == "server"):
-    url = "https://github.com/rogermelich/" + repo + ".git"
   if config.option("git-protocol") == "ssh":
-    url = "git@github.com:ONLYOFFICE/" + repo + ".git"
-    if (repo == "server"):
-      url = "git@github.com:rogermelich/" + repo + ".git"
+    url = "git@github.com:" + owner + "/" + repo + ".git"
   folder = get_script_dir() + "/../../" + repo
   if is_current_dir:
     folder = repo
@@ -519,7 +522,7 @@ def git_update(repo, is_no_errors=False, is_current_dir=False, git_owner=""):
   os.chdir(folder)
   cmd("git", ["fetch"], False if ("1" != config.option("update-light")) else True)
   if is_not_exit or ("1" != config.option("update-light")):
-    retCheckout = cmd("git", ["checkout", "-f", config.option("branch")], True)
+    retCheckout = cmd("git", ["checkout", "-f", branch_to_checkout], True)
     if (retCheckout != 0):
       print("branch does not exist...")
       print("switching to master...")
@@ -704,22 +707,6 @@ def check_congig_option_with_platfom(platform, option_name):
     return True
   return False
 
-def correct_makefile_after_qmake(platform, file):
-  if (0 == platform.find("android")):
-    if ("android_arm64_v8a" == platform):
-      replaceInFile(file, "_arm64-v8a.a", ".a")
-      replaceInFile(file, "_arm64-v8a.so", ".so")
-    if ("android_armv7" == platform):
-      replaceInFile(file, "_armeabi-v7a.a", ".a")
-      replaceInFile(file, "_armeabi-v7a.so", ".so")
-    if ("android_x86_64" == platform):
-      replaceInFile(file, "_x86_64.a", ".a")
-      replaceInFile(file, "_x86_64.so", ".so")
-    if ("android_x86" == platform):
-      replaceInFile(file, "_x86.a", ".a")
-      replaceInFile(file, "_x86.so", ".so")
-  return
-
 def qt_config_platform_addon(platform):
   config_addon = ""
   if (0 == platform.find("win")):
@@ -773,21 +760,6 @@ def qt_config(platform):
 def qt_major_version():
   qt_dir = qt_version()
   return qt_dir.split(".")[0]
-
-def qt_version_decimal():
-  qt_dir = qt_version()
-  return 10 * int(qt_dir.split(".")[0]) + int(qt_dir.split(".")[1])
-
-def qt_config_as_param(value):
-  qt_version = qt_version_decimal()
-  ret_params = []
-  if (66 > qt_version):
-    ret_params.append("CONFIG+=" + value)
-  else:
-    params = value.split()
-    for name in params:
-      ret_params.append("CONFIG+=" + name)
-  return ret_params
 
 def qt_copy_lib(lib, dir):
   qt_dir = get_env("QT_DEPLOY")
